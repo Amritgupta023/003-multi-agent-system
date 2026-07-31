@@ -2,6 +2,7 @@ const express = require("express");
 const { generateResearchPlan } = require("../agents/geminiPlanner");
 const { conductResearch } = require("../agents/tavilyResearcher");
 const { writeReport } = require("../agents/writer");
+const { runSupervisor } = require("../workflow/supervisorGraph");
 const { createJob, getJob, updateJob } = require("./jobStore");
 const { validateResearchRequest } = require("./validation");
 
@@ -155,6 +156,42 @@ researchRouter.post("/:jobId/write", (request, response) => {
     message: "Research report generated",
     data: completedJob,
   });
+});
+
+researchRouter.post("/:jobId/run", async (request, response) => {
+  const job = getJob(request.params.jobId);
+
+  if (!job) {
+    return response.status(404).json({
+      success: false,
+      error: { code: "JOB_NOT_FOUND", message: `Research job ${request.params.jobId} was not found` },
+    });
+  }
+
+  if (job.status === "completed" && job.report) {
+    return response.status(200).json({ success: true, message: "Existing completed workflow returned", data: job });
+  }
+
+  const result = await runSupervisor(job);
+  const updatedJob = updateJob(job.id, {
+    ...result.job,
+    executionTrace: result.trace,
+    workflow: {
+      engine: "langgraph",
+      attempts: result.attempts,
+      lastError: result.error,
+    },
+  });
+
+  if (updatedJob.status === "failed") {
+    return response.status(422).json({
+      success: false,
+      error: { code: "WORKFLOW_REVIEW_FAILED", message: "Supervisor rejected a workflow artifact" },
+      data: updatedJob,
+    });
+  }
+
+  return response.status(200).json({ success: true, message: "Supervised research workflow completed", data: updatedJob });
 });
 
 researchRouter.get("/:jobId", (request, response) => {

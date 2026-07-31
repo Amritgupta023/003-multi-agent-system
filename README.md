@@ -2,7 +2,7 @@
 
 Node.js API that will grow into a supervised research workflow powered by LangGraph, Gemini, Tavily, Redis, and Express.
 
-## Level 7: Writer specialist
+## Level 8: Supervisor and LangGraph orchestration
 
 ### Run locally
 
@@ -22,6 +22,7 @@ The API runs at `http://localhost:3000` by default.
 - `POST /api/research/:jobId/plan` — generate a deterministic, depth-aware research plan
 - `POST /api/research/:jobId/research` — process planned questions into normalized research findings
 - `POST /api/research/:jobId/write` — generate a Markdown report with inline citations
+- `POST /api/research/:jobId/run` — run planner, researcher, writer, and supervisor reviews as one LangGraph workflow
 
 ### Create a research job
 
@@ -70,6 +71,16 @@ POST /api/research/{jobId}/write
 ```
 
 The writer only creates citation markers for collected source URLs. Reports produced from local fallback research are marked `unverified` and explicitly state that source-backed evidence is unavailable.
+
+### Run the supervised workflow
+
+Create a job and call:
+
+```http
+POST /api/research/{jobId}/run
+```
+
+LangGraph routes through planner, plan review, researcher, research review, writer, and report review. The supervisor retries a rejected artifact once, then safely fails the workflow rather than looping forever. `executionTrace` records every node, decision, attempt, provider, and timestamp.
 
 ### Test
 

@@ -10,7 +10,7 @@ app.get("/", (_request, response) => {
   response.status(200).json({
     success: true,
     message: "Multi-Agent Research Assistant API",
-    level: 7,
+    level: 8,
   });
 });
 
@@ -19,7 +19,7 @@ app.get("/api/health", (_request, response) => {
     success: true,
     status: "ok",
     service: "multi-agent-research-assistant",
-    level: 7,
+    level: 8,
     timestamp: new Date().toISOString(),
   });
 });

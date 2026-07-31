@@ -31,7 +31,7 @@ test("GET /api/health reports a healthy service", async () => {
   assert.equal(response.status, 200);
   assert.equal(body.success, true);
   assert.equal(body.status, "ok");
-  assert.equal(body.level, 7);
+  assert.equal(body.level, 8);
 });
 
 test("POST /api/research creates a queued research job", async () => {
@@ -257,6 +257,40 @@ test("POST /api/research/:jobId/write completes a job with a report", async () =
 
 test("writing a missing job returns JOB_NOT_FOUND", async () => {
   const response = await fetch(`${baseUrl}/api/research/missing-job/write`, { method: "POST" });
+  const body = await response.json();
+
+  assert.equal(response.status, 404);
+  assert.equal(body.error.code, "JOB_NOT_FOUND");
+});
+
+test("POST /api/research/:jobId/run completes the supervised workflow", async () => {
+  const createResponse = await fetch(`${baseUrl}/api/research`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ topic: "AI governance in healthcare", depth: "quick", maxSources: 3 }),
+  });
+  const job = (await createResponse.json()).data;
+  const response = await fetch(`${baseUrl}/api/research/${job.id}/run`, { method: "POST" });
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(body.data.status, "completed");
+  assert.equal(body.data.progress, 100);
+  assert.equal(body.data.workflow.engine, "langgraph");
+  assert.deepEqual(body.data.workflow.attempts, { planner: 1, researcher: 1, writer: 1 });
+  assert.equal(body.data.executionTrace.length, 6);
+  assert.deepEqual(body.data.executionTrace.map((event) => event.node), [
+    "planner", "supervisor", "researcher", "supervisor", "writer", "supervisor",
+  ]);
+  assert.ok(body.data.report.markdown.startsWith("# AI governance in healthcare"));
+
+  const secondResponse = await fetch(`${baseUrl}/api/research/${job.id}/run`, { method: "POST" });
+  const secondBody = await secondResponse.json();
+  assert.equal(secondBody.message, "Existing completed workflow returned");
+});
+
+test("running a missing workflow job returns JOB_NOT_FOUND", async () => {
+  const response = await fetch(`${baseUrl}/api/research/missing-job/run`, { method: "POST" });
   const body = await response.json();
 
   assert.equal(response.status, 404);
