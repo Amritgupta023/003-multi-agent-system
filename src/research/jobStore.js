@@ -23,8 +23,21 @@ function getJob(id) {
   return jobs.get(id) || null;
 }
 
+function updateJob(id, changes) {
+  const existingJob = getJob(id);
+  if (!existingJob) return null;
+
+  const updatedJob = {
+    ...existingJob,
+    ...changes,
+    updatedAt: new Date().toISOString(),
+  };
+  jobs.set(id, updatedJob);
+  return updatedJob;
+}
+
 function clearJobs() {
   jobs.clear();
 }
 
-module.exports = { clearJobs, createJob, getJob };
+module.exports = { clearJobs, createJob, getJob, updateJob };

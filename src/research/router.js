@@ -1,5 +1,6 @@
 const express = require("express");
-const { createJob, getJob } = require("./jobStore");
+const { buildResearchPlan } = require("../agents/planner");
+const { createJob, getJob, updateJob } = require("./jobStore");
 const { validateResearchRequest } = require("./validation");
 
 const researchRouter = express.Router();
@@ -23,6 +24,42 @@ researchRouter.post("/", (request, response) => {
     success: true,
     message: "Research job accepted",
     data: job,
+  });
+});
+
+researchRouter.post("/:jobId/plan", (request, response) => {
+  const job = getJob(request.params.jobId);
+
+  if (!job) {
+    return response.status(404).json({
+      success: false,
+      error: {
+        code: "JOB_NOT_FOUND",
+        message: `Research job ${request.params.jobId} was not found`,
+      },
+    });
+  }
+
+  if (job.plan) {
+    return response.status(200).json({
+      success: true,
+      message: "Existing research plan returned",
+      data: job,
+    });
+  }
+
+  const plan = buildResearchPlan(job);
+  const plannedJob = updateJob(job.id, {
+    status: "planned",
+    progress: 25,
+    currentStep: "waiting_for_researcher",
+    plan,
+  });
+
+  return response.status(200).json({
+    success: true,
+    message: "Research plan generated",
+    data: plannedJob,
   });
 });
 

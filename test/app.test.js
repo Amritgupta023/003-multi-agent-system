@@ -27,7 +27,7 @@ test("GET /api/health reports a healthy service", async () => {
   assert.equal(response.status, 200);
   assert.equal(body.success, true);
   assert.equal(body.status, "ok");
-  assert.equal(body.level, 2);
+  assert.equal(body.level, 3);
 });
 
 test("POST /api/research creates a queued research job", async () => {
@@ -79,6 +79,72 @@ test("POST /api/research rejects invalid fields", async () => {
 
 test("GET /api/research/:jobId returns JOB_NOT_FOUND", async () => {
   const response = await fetch(`${baseUrl}/api/research/missing-job`);
+  const body = await response.json();
+
+  assert.equal(response.status, 404);
+  assert.equal(body.error.code, "JOB_NOT_FOUND");
+});
+
+test("POST /api/research/:jobId/plan creates and stores a depth-aware plan", async () => {
+  const createResponse = await fetch(`${baseUrl}/api/research`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ topic: "Renewable energy in India", depth: "deep", maxSources: 12 }),
+  });
+  const createdJob = (await createResponse.json()).data;
+
+  const planResponse = await fetch(`${baseUrl}/api/research/${createdJob.id}/plan`, { method: "POST" });
+  const body = await planResponse.json();
+
+  assert.equal(planResponse.status, 200);
+  assert.equal(body.data.status, "planned");
+  assert.equal(body.data.progress, 25);
+  assert.equal(body.data.currentStep, "waiting_for_researcher");
+  assert.equal(body.data.plan.questions.length, 7);
+  assert.equal(body.data.plan.sourceBudget, 12);
+  assert.equal(body.data.plan.generatedBy, "local-planner-v1");
+
+  const statusResponse = await fetch(`${baseUrl}/api/research/${createdJob.id}`);
+  const storedJob = (await statusResponse.json()).data;
+  assert.deepEqual(storedJob.plan, body.data.plan);
+});
+
+test("planner changes question count based on research depth", async () => {
+  const expectedCounts = { quick: 3, standard: 5, deep: 7 };
+
+  for (const [depth, expectedCount] of Object.entries(expectedCounts)) {
+    const createResponse = await fetch(`${baseUrl}/api/research`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ topic: "Electric vehicle adoption", depth }),
+    });
+    const job = (await createResponse.json()).data;
+    const planResponse = await fetch(`${baseUrl}/api/research/${job.id}/plan`, { method: "POST" });
+    const plannedJob = (await planResponse.json()).data;
+
+    assert.equal(plannedJob.plan.questions.length, expectedCount);
+  }
+});
+
+test("planning is idempotent and returns the existing plan", async () => {
+  const createResponse = await fetch(`${baseUrl}/api/research`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ topic: "Space tourism economics" }),
+  });
+  const job = (await createResponse.json()).data;
+  const firstResponse = await fetch(`${baseUrl}/api/research/${job.id}/plan`, { method: "POST" });
+  const firstBody = await firstResponse.json();
+  const secondResponse = await fetch(`${baseUrl}/api/research/${job.id}/plan`, { method: "POST" });
+  const secondBody = await secondResponse.json();
+
+  assert.equal(secondResponse.status, 200);
+  assert.equal(secondBody.message, "Existing research plan returned");
+  assert.deepEqual(secondBody.data.plan, firstBody.data.plan);
+});
+
+test("planning a missing job returns JOB_NOT_FOUND", async () => {
+  const response = await fetch(`${baseUrl}/api/research/missing-job/plan`, { method: "POST" });
   const body = await response.json();
 
   assert.equal(response.status, 404);
