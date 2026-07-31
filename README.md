@@ -2,7 +2,7 @@
 
 Node.js API that will grow into a supervised research workflow powered by LangGraph, Gemini, Tavily, Redis, and Express.
 
-## Level 6: Tavily live web search
+## Level 7: Writer specialist
 
 ### Run locally
 
@@ -21,6 +21,7 @@ The API runs at `http://localhost:3000` by default.
 - `GET /api/research/:jobId` — inspect a research job and its current status
 - `POST /api/research/:jobId/plan` — generate a deterministic, depth-aware research plan
 - `POST /api/research/:jobId/research` — process planned questions into normalized research findings
+- `POST /api/research/:jobId/write` — generate a Markdown report with inline citations
 
 ### Create a research job
 
@@ -59,6 +60,16 @@ POST /api/research/{jobId}/research
 Set `TAVILY_API_KEY` in `.env` to run live web searches. The researcher normalizes Tavily results, removes duplicate URLs, enforces the job's total source budget, and records titles, URLs, domains, snippets, relevance scores, and publication dates. `deep` jobs use advanced search; other depths use basic search.
 
 When the key is missing or all searches fail, the endpoint still returns the Level 5 local research framework with `provider: "local"` and a `fallbackReason`.
+
+### Generate the report
+
+Run the researcher first, then call:
+
+```http
+POST /api/research/{jobId}/write
+```
+
+The writer only creates citation markers for collected source URLs. Reports produced from local fallback research are marked `unverified` and explicitly state that source-backed evidence is unavailable.
 
 ### Test
 

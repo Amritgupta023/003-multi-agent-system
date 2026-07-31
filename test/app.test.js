@@ -31,7 +31,7 @@ test("GET /api/health reports a healthy service", async () => {
   assert.equal(response.status, 200);
   assert.equal(body.success, true);
   assert.equal(body.status, "ok");
-  assert.equal(body.level, 6);
+  assert.equal(body.level, 7);
 });
 
 test("POST /api/research creates a queued research job", async () => {
@@ -212,6 +212,55 @@ test("researching is idempotent and missing jobs return JOB_NOT_FOUND", async ()
   const missingBody = await missingResponse.json();
   assert.equal(missingResponse.status, 404);
   assert.equal(missingBody.error.code, "JOB_NOT_FOUND");
+});
+
+test("POST /api/research/:jobId/write requires research", async () => {
+  const createResponse = await fetch(`${baseUrl}/api/research`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ topic: "Circular economy policy" }),
+  });
+  const job = (await createResponse.json()).data;
+  const response = await fetch(`${baseUrl}/api/research/${job.id}/write`, { method: "POST" });
+  const body = await response.json();
+
+  assert.equal(response.status, 409);
+  assert.equal(body.error.code, "RESEARCH_REQUIRED");
+});
+
+test("POST /api/research/:jobId/write completes a job with a report", async () => {
+  const createResponse = await fetch(`${baseUrl}/api/research`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ topic: "Circular economy policy", depth: "quick" }),
+  });
+  const job = (await createResponse.json()).data;
+  await fetch(`${baseUrl}/api/research/${job.id}/plan`, { method: "POST" });
+  await fetch(`${baseUrl}/api/research/${job.id}/research`, { method: "POST" });
+
+  const response = await fetch(`${baseUrl}/api/research/${job.id}/write`, { method: "POST" });
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(body.data.status, "completed");
+  assert.equal(body.data.progress, 100);
+  assert.equal(body.data.currentStep, "completed");
+  assert.equal(body.data.report.format, "markdown");
+  assert.equal(body.data.report.evidenceStatus, "unverified");
+  assert.match(body.data.report.markdown, /^# Circular economy policy/);
+
+  const secondResponse = await fetch(`${baseUrl}/api/research/${job.id}/write`, { method: "POST" });
+  const secondBody = await secondResponse.json();
+  assert.equal(secondBody.message, "Existing report returned");
+  assert.deepEqual(secondBody.data.report, body.data.report);
+});
+
+test("writing a missing job returns JOB_NOT_FOUND", async () => {
+  const response = await fetch(`${baseUrl}/api/research/missing-job/write`, { method: "POST" });
+  const body = await response.json();
+
+  assert.equal(response.status, 404);
+  assert.equal(body.error.code, "JOB_NOT_FOUND");
 });
 
 test("unknown routes return the standard 404 response", async () => {

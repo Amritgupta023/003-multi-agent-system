@@ -1,6 +1,7 @@
 const express = require("express");
 const { generateResearchPlan } = require("../agents/geminiPlanner");
 const { conductResearch } = require("../agents/tavilyResearcher");
+const { writeReport } = require("../agents/writer");
 const { createJob, getJob, updateJob } = require("./jobStore");
 const { validateResearchRequest } = require("./validation");
 
@@ -107,6 +108,52 @@ researchRouter.post("/:jobId/research", async (request, response) => {
     success: true,
     message: "Research step completed",
     data: researchedJob,
+  });
+});
+
+researchRouter.post("/:jobId/write", (request, response) => {
+  const job = getJob(request.params.jobId);
+
+  if (!job) {
+    return response.status(404).json({
+      success: false,
+      error: {
+        code: "JOB_NOT_FOUND",
+        message: `Research job ${request.params.jobId} was not found`,
+      },
+    });
+  }
+
+  if (!job.research) {
+    return response.status(409).json({
+      success: false,
+      error: {
+        code: "RESEARCH_REQUIRED",
+        message: "Run the researcher before generating a report",
+      },
+    });
+  }
+
+  if (job.report) {
+    return response.status(200).json({
+      success: true,
+      message: "Existing report returned",
+      data: job,
+    });
+  }
+
+  const report = writeReport(job);
+  const completedJob = updateJob(job.id, {
+    status: "completed",
+    progress: 100,
+    currentStep: "completed",
+    report,
+  });
+
+  return response.status(200).json({
+    success: true,
+    message: "Research report generated",
+    data: completedJob,
   });
 });
 
