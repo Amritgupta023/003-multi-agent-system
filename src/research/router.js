@@ -1,5 +1,5 @@
 const express = require("express");
-const { buildResearchPlan } = require("../agents/planner");
+const { generateResearchPlan } = require("../agents/geminiPlanner");
 const { createJob, getJob, updateJob } = require("./jobStore");
 const { validateResearchRequest } = require("./validation");
 
@@ -27,7 +27,7 @@ researchRouter.post("/", (request, response) => {
   });
 });
 
-researchRouter.post("/:jobId/plan", (request, response) => {
+researchRouter.post("/:jobId/plan", async (request, response) => {
   const job = getJob(request.params.jobId);
 
   if (!job) {
@@ -48,7 +48,7 @@ researchRouter.post("/:jobId/plan", (request, response) => {
     });
   }
 
-  const plan = buildResearchPlan(job);
+  const plan = await generateResearchPlan(job);
   const plannedJob = updateJob(job.id, {
     status: "planned",
     progress: 25,

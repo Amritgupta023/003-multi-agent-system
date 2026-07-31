@@ -27,7 +27,7 @@ test("GET /api/health reports a healthy service", async () => {
   assert.equal(response.status, 200);
   assert.equal(body.success, true);
   assert.equal(body.status, "ok");
-  assert.equal(body.level, 3);
+  assert.equal(body.level, 4);
 });
 
 test("POST /api/research creates a queued research job", async () => {
@@ -103,6 +103,7 @@ test("POST /api/research/:jobId/plan creates and stores a depth-aware plan", asy
   assert.equal(body.data.plan.questions.length, 7);
   assert.equal(body.data.plan.sourceBudget, 12);
   assert.equal(body.data.plan.generatedBy, "local-planner-v1");
+  assert.equal(body.data.plan.provider, "local");
 
   const statusResponse = await fetch(`${baseUrl}/api/research/${createdJob.id}`);
   const storedJob = (await statusResponse.json()).data;

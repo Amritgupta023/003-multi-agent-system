@@ -2,7 +2,7 @@
 
 Node.js API that will grow into a supervised research workflow powered by LangGraph, Gemini, Tavily, Redis, and Express.
 
-## Level 3: Planner specialist
+## Level 4: Gemini planner integration
 
 ### Run locally
 
@@ -43,7 +43,9 @@ Create a job first, then call:
 POST /api/research/{jobId}/plan
 ```
 
-The local planner generates 3 questions for `quick`, 5 for `standard`, and 7 for `deep`. Repeating the request returns the stored plan instead of generating a different one.
+The Gemini planner generates 3 questions for `quick`, 5 for `standard`, and 7 for `deep`. Repeating the request returns the stored plan instead of generating a different one.
+
+Copy `.env.example` to `.env` and set `GEMINI_API_KEY` to use Gemini. `GEMINI_MODEL` defaults to `gemini-2.5-flash`, and `GEMINI_TIMEOUT_MS` defaults to 15000. If the key is absent, Gemini times out, or its response is invalid, the request still succeeds with the local deterministic planner. Inspect `plan.provider` and `plan.fallbackReason` to see which path ran.
 
 ### Test
 
