@@ -1,4 +1,5 @@
 const express = require("express");
+const { researchRouter } = require("./research/router");
 
 const app = express();
 
@@ -9,7 +10,7 @@ app.get("/", (_request, response) => {
   response.status(200).json({
     success: true,
     message: "Multi-Agent Research Assistant API",
-    level: 1,
+    level: 2,
   });
 });
 
@@ -18,10 +19,12 @@ app.get("/api/health", (_request, response) => {
     success: true,
     status: "ok",
     service: "multi-agent-research-assistant",
-    level: 1,
+    level: 2,
     timestamp: new Date().toISOString(),
   });
 });
+
+app.use("/api/research", researchRouter);
 
 app.use((request, response) => {
   response.status(404).json({
