@@ -27,7 +27,7 @@ test("GET /api/health reports a healthy service", async () => {
   assert.equal(response.status, 200);
   assert.equal(body.success, true);
   assert.equal(body.status, "ok");
-  assert.equal(body.level, 4);
+  assert.equal(body.level, 5);
 });
 
 test("POST /api/research creates a queued research job", async () => {
@@ -150,6 +150,64 @@ test("planning a missing job returns JOB_NOT_FOUND", async () => {
 
   assert.equal(response.status, 404);
   assert.equal(body.error.code, "JOB_NOT_FOUND");
+});
+
+test("POST /api/research/:jobId/research requires a plan", async () => {
+  const createResponse = await fetch(`${baseUrl}/api/research`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ topic: "Green hydrogen market" }),
+  });
+  const job = (await createResponse.json()).data;
+  const response = await fetch(`${baseUrl}/api/research/${job.id}/research`, { method: "POST" });
+  const body = await response.json();
+
+  assert.equal(response.status, 409);
+  assert.equal(body.error.code, "PLAN_REQUIRED");
+});
+
+test("POST /api/research/:jobId/research stores normalized findings", async () => {
+  const createResponse = await fetch(`${baseUrl}/api/research`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ topic: "Green hydrogen market", depth: "quick", maxSources: 4 }),
+  });
+  const job = (await createResponse.json()).data;
+  await fetch(`${baseUrl}/api/research/${job.id}/plan`, { method: "POST" });
+
+  const response = await fetch(`${baseUrl}/api/research/${job.id}/research`, { method: "POST" });
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(body.data.status, "researched");
+  assert.equal(body.data.progress, 65);
+  assert.equal(body.data.currentStep, "waiting_for_writer");
+  assert.equal(body.data.research.findings.length, 3);
+  assert.equal(body.data.research.provider, "local");
+  assert.equal(body.data.research.sourceSummary.collected, 0);
+  assert.ok(body.data.research.findings.every((finding) => finding.evidenceStatus === "pending_live_search"));
+});
+
+test("researching is idempotent and missing jobs return JOB_NOT_FOUND", async () => {
+  const createResponse = await fetch(`${baseUrl}/api/research`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ topic: "Battery recycling systems", depth: "quick" }),
+  });
+  const job = (await createResponse.json()).data;
+  await fetch(`${baseUrl}/api/research/${job.id}/plan`, { method: "POST" });
+  const firstResponse = await fetch(`${baseUrl}/api/research/${job.id}/research`, { method: "POST" });
+  const firstBody = await firstResponse.json();
+  const secondResponse = await fetch(`${baseUrl}/api/research/${job.id}/research`, { method: "POST" });
+  const secondBody = await secondResponse.json();
+
+  assert.equal(secondBody.message, "Existing research results returned");
+  assert.deepEqual(secondBody.data.research, firstBody.data.research);
+
+  const missingResponse = await fetch(`${baseUrl}/api/research/missing-job/research`, { method: "POST" });
+  const missingBody = await missingResponse.json();
+  assert.equal(missingResponse.status, 404);
+  assert.equal(missingBody.error.code, "JOB_NOT_FOUND");
 });
 
 test("unknown routes return the standard 404 response", async () => {

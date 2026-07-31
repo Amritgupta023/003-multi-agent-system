@@ -1,5 +1,6 @@
 const express = require("express");
 const { generateResearchPlan } = require("../agents/geminiPlanner");
+const { conductLocalResearch } = require("../agents/researcher");
 const { createJob, getJob, updateJob } = require("./jobStore");
 const { validateResearchRequest } = require("./validation");
 
@@ -60,6 +61,52 @@ researchRouter.post("/:jobId/plan", async (request, response) => {
     success: true,
     message: "Research plan generated",
     data: plannedJob,
+  });
+});
+
+researchRouter.post("/:jobId/research", (request, response) => {
+  const job = getJob(request.params.jobId);
+
+  if (!job) {
+    return response.status(404).json({
+      success: false,
+      error: {
+        code: "JOB_NOT_FOUND",
+        message: `Research job ${request.params.jobId} was not found`,
+      },
+    });
+  }
+
+  if (!job.plan) {
+    return response.status(409).json({
+      success: false,
+      error: {
+        code: "PLAN_REQUIRED",
+        message: "Generate a research plan before running the researcher",
+      },
+    });
+  }
+
+  if (job.research) {
+    return response.status(200).json({
+      success: true,
+      message: "Existing research results returned",
+      data: job,
+    });
+  }
+
+  const research = conductLocalResearch(job);
+  const researchedJob = updateJob(job.id, {
+    status: "researched",
+    progress: 65,
+    currentStep: "waiting_for_writer",
+    research,
+  });
+
+  return response.status(200).json({
+    success: true,
+    message: "Research step completed",
+    data: researchedJob,
   });
 });
 
