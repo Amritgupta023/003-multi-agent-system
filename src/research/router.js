@@ -1,6 +1,6 @@
 const express = require("express");
 const { generateResearchPlan } = require("../agents/geminiPlanner");
-const { conductLocalResearch } = require("../agents/researcher");
+const { conductResearch } = require("../agents/tavilyResearcher");
 const { createJob, getJob, updateJob } = require("./jobStore");
 const { validateResearchRequest } = require("./validation");
 
@@ -64,7 +64,7 @@ researchRouter.post("/:jobId/plan", async (request, response) => {
   });
 });
 
-researchRouter.post("/:jobId/research", (request, response) => {
+researchRouter.post("/:jobId/research", async (request, response) => {
   const job = getJob(request.params.jobId);
 
   if (!job) {
@@ -95,7 +95,7 @@ researchRouter.post("/:jobId/research", (request, response) => {
     });
   }
 
-  const research = conductLocalResearch(job);
+  const research = await conductResearch(job);
   const researchedJob = updateJob(job.id, {
     status: "researched",
     progress: 65,

@@ -1,5 +1,9 @@
 const assert = require("node:assert/strict");
 const { after, before, test } = require("node:test");
+
+process.env.GEMINI_API_KEY = "";
+process.env.TAVILY_API_KEY = "";
+
 const { app } = require("../src/app");
 const { clearJobs } = require("../src/research/jobStore");
 
@@ -27,7 +31,7 @@ test("GET /api/health reports a healthy service", async () => {
   assert.equal(response.status, 200);
   assert.equal(body.success, true);
   assert.equal(body.status, "ok");
-  assert.equal(body.level, 5);
+  assert.equal(body.level, 6);
 });
 
 test("POST /api/research creates a queued research job", async () => {

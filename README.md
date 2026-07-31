@@ -2,7 +2,7 @@
 
 Node.js API that will grow into a supervised research workflow powered by LangGraph, Gemini, Tavily, Redis, and Express.
 
-## Level 5: Researcher specialist
+## Level 6: Tavily live web search
 
 ### Run locally
 
@@ -56,7 +56,9 @@ Generate a plan first, then call:
 POST /api/research/{jobId}/research
 ```
 
-At Level 5 the researcher creates a normalized research framework for every planned question. Its empty `sources` arrays, `unverified` confidence, and `pending_live_search` status are intentional: real source-backed findings arrive with Tavily in Level 6.
+Set `TAVILY_API_KEY` in `.env` to run live web searches. The researcher normalizes Tavily results, removes duplicate URLs, enforces the job's total source budget, and records titles, URLs, domains, snippets, relevance scores, and publication dates. `deep` jobs use advanced search; other depths use basic search.
+
+When the key is missing or all searches fail, the endpoint still returns the Level 5 local research framework with `provider: "local"` and a `fallbackReason`.
 
 ### Test
 
