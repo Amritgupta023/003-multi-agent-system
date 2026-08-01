@@ -2,7 +2,7 @@
 
 Node.js API that will grow into a supervised research workflow powered by LangGraph, Gemini, Tavily, Redis, and Express.
 
-## Level 9: Redis persistence
+## Level 10: Asynchronous background execution
 
 ### Run locally
 
@@ -23,6 +23,9 @@ The API runs at `http://localhost:3000` by default.
 - `POST /api/research/:jobId/research` — process planned questions into normalized research findings
 - `POST /api/research/:jobId/write` — generate a Markdown report with inline citations
 - `POST /api/research/:jobId/run` — run planner, researcher, writer, and supervisor reviews as one LangGraph workflow
+- `POST /api/research/:jobId/run-async` — start the supervised workflow in the background
+- `GET /api/research/:jobId/status` — poll compact progress and failure details
+- `POST /api/research/:jobId/retry` — restart a failed workflow from a clean state
 
 ### Create a research job
 
@@ -95,6 +98,12 @@ REDIS_REQUIRED=false
 ```
 
 Jobs are stored as JSON with a configurable TTL. When Redis is not configured, development uses memory storage. When Redis is configured but unavailable and `REDIS_REQUIRED=false`, the API keeps working with a mirrored memory fallback and health reports `degraded`. Set `REDIS_REQUIRED=true` when persistence must be mandatory.
+
+### Background execution
+
+Set `"runAsync": true` while creating a job, or call `POST /api/research/{jobId}/run-async`. Both return `202 Accepted` immediately with a run ID and status URL. Poll `GET /api/research/{jobId}/status` until the status becomes `completed` or `failed`.
+
+Every LangGraph state update is persisted, so Redis-backed jobs expose stage-by-stage progress. In-process locks reject concurrent runs for the same job. Failed jobs include safe retry metadata and can be restarted with `POST /api/research/{jobId}/retry`.
 
 ### Test
 

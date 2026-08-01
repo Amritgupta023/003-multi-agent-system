@@ -3,6 +3,7 @@ const { generateResearchPlan } = require("../agents/geminiPlanner");
 const { conductResearch } = require("../agents/tavilyResearcher");
 const { writeReport } = require("../agents/writer");
 const { runSupervisor } = require("../workflow/supervisorGraph");
+const { getActiveRun, startBackgroundRun } = require("../workflow/backgroundRunner");
 const { createJob, getJob, updateJob } = require("./jobStore");
 const { validateResearchRequest } = require("./validation");
 
@@ -23,6 +24,15 @@ researchRouter.post("/", async (request, response) => {
   }
 
   const job = await createJob(validation.value);
+  if (validation.value.runAsync) {
+    const run = await startBackgroundRun(job.id);
+    return response.status(202).location(`/api/research/${job.id}/status`).json({
+      success: true,
+      message: "Research job accepted and background workflow started",
+      data: run.job,
+      runId: run.runId,
+    });
+  }
   return response.status(202).location(`/api/research/${job.id}`).json({
     success: true,
     message: "Research job accepted",
@@ -168,6 +178,13 @@ researchRouter.post("/:jobId/run", async (request, response) => {
     });
   }
 
+  if (getActiveRun(job.id)) {
+    return response.status(409).json({
+      success: false,
+      error: { code: "RUN_ALREADY_ACTIVE", message: "A background workflow is already running for this job" },
+    });
+  }
+
   if (job.status === "completed" && job.report) {
     return response.status(200).json({ success: true, message: "Existing completed workflow returned", data: job });
   }
@@ -192,6 +209,99 @@ researchRouter.post("/:jobId/run", async (request, response) => {
   }
 
   return response.status(200).json({ success: true, message: "Supervised research workflow completed", data: updatedJob });
+});
+
+researchRouter.post("/:jobId/run-async", async (request, response) => {
+  const job = await getJob(request.params.jobId);
+  if (!job) {
+    return response.status(404).json({
+      success: false,
+      error: { code: "JOB_NOT_FOUND", message: `Research job ${request.params.jobId} was not found` },
+    });
+  }
+  if (job.status === "completed") {
+    return response.status(409).json({
+      success: false,
+      error: { code: "JOB_ALREADY_COMPLETED", message: "This research job is already complete" },
+    });
+  }
+
+  const run = await startBackgroundRun(job.id);
+  if (!run.started) {
+    return response.status(409).json({
+      success: false,
+      error: { code: "RUN_ALREADY_ACTIVE", message: "A background workflow is already running for this job" },
+      runId: run.runId,
+    });
+  }
+
+  return response.status(202).location(`/api/research/${job.id}/status`).json({
+    success: true,
+    message: "Background workflow started",
+    data: {
+      jobId: job.id,
+      runId: run.runId,
+      status: "running",
+      statusUrl: `/api/research/${job.id}/status`,
+    },
+  });
+});
+
+researchRouter.post("/:jobId/retry", async (request, response) => {
+  const job = await getJob(request.params.jobId);
+  if (!job) {
+    return response.status(404).json({
+      success: false,
+      error: { code: "JOB_NOT_FOUND", message: `Research job ${request.params.jobId} was not found` },
+    });
+  }
+  if (getActiveRun(job.id)) {
+    return response.status(409).json({
+      success: false,
+      error: { code: "RUN_ALREADY_ACTIVE", message: "A background workflow is already running for this job" },
+    });
+  }
+  if (job.status !== "failed") {
+    return response.status(409).json({
+      success: false,
+      error: { code: "JOB_NOT_FAILED", message: "Only failed jobs can be retried" },
+    });
+  }
+
+  const run = await startBackgroundRun(job.id, { retry: true });
+  return response.status(202).location(`/api/research/${job.id}/status`).json({
+    success: true,
+    message: "Failed workflow queued for retry",
+    data: { jobId: job.id, runId: run.runId, status: "running", statusUrl: `/api/research/${job.id}/status` },
+  });
+});
+
+researchRouter.get("/:jobId/status", async (request, response) => {
+  const job = await getJob(request.params.jobId);
+  if (!job) {
+    return response.status(404).json({
+      success: false,
+      error: { code: "JOB_NOT_FOUND", message: `Research job ${request.params.jobId} was not found` },
+    });
+  }
+
+  return response.status(200).json({
+    success: true,
+    data: {
+      id: job.id,
+      status: job.status,
+      progress: job.progress,
+      currentStep: job.currentStep,
+      backgroundRun: job.backgroundRun || null,
+      failure: job.failure || null,
+      lastError: job.workflow?.lastError || null,
+      updatedAt: job.updatedAt,
+      links: {
+        job: `/api/research/${job.id}`,
+        report: job.report ? `/api/research/${job.id}` : null,
+      },
+    },
+  });
 });
 
 researchRouter.get("/:jobId", async (request, response) => {

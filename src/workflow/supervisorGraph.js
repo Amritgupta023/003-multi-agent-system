@@ -9,6 +9,21 @@ async function runSupervisor(job, dependencies = {}) {
   return graph.invoke({ job, trace: [], attempts: {}, error: null });
 }
 
+async function runSupervisorStream(job, onState, dependencies = {}) {
+  const graph = await createSupervisorGraph(dependencies);
+  let finalState = null;
+  const stream = await graph.stream(
+    { job, trace: [], attempts: {}, error: null },
+    { streamMode: "values" },
+  );
+
+  for await (const state of stream) {
+    finalState = state;
+    await onState(state);
+  }
+  return finalState;
+}
+
 async function createSupervisorGraph(dependencies = {}) {
   const { Annotation, END, START, StateGraph } = await import("@langchain/langgraph");
   const State = Annotation.Root({
@@ -161,4 +176,4 @@ function traceEvent(node, status, attempt, provider = null) {
   return { node, status, attempt, provider, timestamp: new Date().toISOString() };
 }
 
-module.exports = { createSupervisorGraph, runSupervisor };
+module.exports = { createSupervisorGraph, runSupervisor, runSupervisorStream };

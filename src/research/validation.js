@@ -13,6 +13,7 @@ function validateResearchRequest(body) {
   const topic = typeof body.topic === "string" ? body.topic.trim() : "";
   const depth = body.depth === undefined ? "standard" : body.depth;
   const maxSources = body.maxSources === undefined ? 5 : body.maxSources;
+  const runAsync = body.runAsync === undefined ? false : body.runAsync;
 
   if (!topic) {
     errors.push({ field: "topic", message: "Topic is required" });
@@ -28,7 +29,11 @@ function validateResearchRequest(body) {
     errors.push({ field: "maxSources", message: "maxSources must be an integer between 1 and 20" });
   }
 
-  return { valid: errors.length === 0, errors, value: { topic, depth, maxSources } };
+  if (typeof runAsync !== "boolean") {
+    errors.push({ field: "runAsync", message: "runAsync must be a boolean" });
+  }
+
+  return { valid: errors.length === 0, errors, value: { topic, depth, maxSources, runAsync } };
 }
 
 module.exports = { validateResearchRequest };

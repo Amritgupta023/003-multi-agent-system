@@ -32,7 +32,7 @@ test("GET /api/health reports a healthy service", async () => {
   assert.equal(response.status, 200);
   assert.equal(body.success, true);
   assert.equal(body.status, "ok");
-  assert.equal(body.level, 9);
+  assert.equal(body.level, 10);
   assert.deepEqual(body.storage, { provider: "memory", status: "ready", persistent: false });
 });
 
@@ -297,6 +297,58 @@ test("running a missing workflow job returns JOB_NOT_FOUND", async () => {
 
   assert.equal(response.status, 404);
   assert.equal(body.error.code, "JOB_NOT_FOUND");
+});
+
+test("runAsync creation starts a pollable background workflow", async () => {
+  const createResponse = await fetch(`${baseUrl}/api/research`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      topic: "Autonomous vehicle regulation",
+      depth: "quick",
+      maxSources: 3,
+      runAsync: true,
+    }),
+  });
+  const created = await createResponse.json();
+
+  assert.equal(createResponse.status, 202);
+  assert.equal(created.message, "Research job accepted and background workflow started");
+  assert.ok(created.runId);
+  assert.equal(created.data.backgroundRun.status, "running");
+
+  let statusBody;
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    const statusResponse = await fetch(`${baseUrl}/api/research/${created.data.id}/status`);
+    statusBody = await statusResponse.json();
+    if (["completed", "failed"].includes(statusBody.data.status)) break;
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+
+  assert.equal(statusBody.data.status, "completed");
+  assert.equal(statusBody.data.progress, 100);
+  assert.equal(statusBody.data.backgroundRun.status, "completed");
+  assert.equal(statusBody.data.failure, null);
+});
+
+test("async endpoints validate missing and completed jobs", async () => {
+  const missingResponse = await fetch(`${baseUrl}/api/research/missing-job/run-async`, { method: "POST" });
+  const missingBody = await missingResponse.json();
+  assert.equal(missingResponse.status, 404);
+  assert.equal(missingBody.error.code, "JOB_NOT_FOUND");
+
+  const createResponse = await fetch(`${baseUrl}/api/research`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ topic: "Completed async guard", depth: "quick" }),
+  });
+  const job = (await createResponse.json()).data;
+  await fetch(`${baseUrl}/api/research/${job.id}/run`, { method: "POST" });
+  const rerunResponse = await fetch(`${baseUrl}/api/research/${job.id}/run-async`, { method: "POST" });
+  const rerunBody = await rerunResponse.json();
+
+  assert.equal(rerunResponse.status, 409);
+  assert.equal(rerunBody.error.code, "JOB_ALREADY_COMPLETED");
 });
 
 test("unknown routes return the standard 404 response", async () => {
