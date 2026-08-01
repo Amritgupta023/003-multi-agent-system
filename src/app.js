@@ -1,5 +1,6 @@
 const express = require("express");
 const { researchRouter } = require("./research/router");
+const { getStorageHealth } = require("./research/jobStore");
 
 const app = express();
 
@@ -10,16 +11,18 @@ app.get("/", (_request, response) => {
   response.status(200).json({
     success: true,
     message: "Multi-Agent Research Assistant API",
-    level: 8,
+    level: 9,
   });
 });
 
-app.get("/api/health", (_request, response) => {
+app.get("/api/health", async (_request, response) => {
+  const storage = await getStorageHealth();
   response.status(200).json({
     success: true,
     status: "ok",
     service: "multi-agent-research-assistant",
-    level: 8,
+    level: 9,
+    storage,
     timestamp: new Date().toISOString(),
   });
 });

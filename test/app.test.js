@@ -3,6 +3,7 @@ const { after, before, test } = require("node:test");
 
 process.env.GEMINI_API_KEY = "";
 process.env.TAVILY_API_KEY = "";
+process.env.REDIS_URL = "";
 
 const { app } = require("../src/app");
 const { clearJobs } = require("../src/research/jobStore");
@@ -31,7 +32,8 @@ test("GET /api/health reports a healthy service", async () => {
   assert.equal(response.status, 200);
   assert.equal(body.success, true);
   assert.equal(body.status, "ok");
-  assert.equal(body.level, 8);
+  assert.equal(body.level, 9);
+  assert.deepEqual(body.storage, { provider: "memory", status: "ready", persistent: false });
 });
 
 test("POST /api/research creates a queued research job", async () => {

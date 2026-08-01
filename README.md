@@ -2,7 +2,7 @@
 
 Node.js API that will grow into a supervised research workflow powered by LangGraph, Gemini, Tavily, Redis, and Express.
 
-## Level 8: Supervisor and LangGraph orchestration
+## Level 9: Redis persistence
 
 ### Run locally
 
@@ -81,6 +81,20 @@ POST /api/research/{jobId}/run
 ```
 
 LangGraph routes through planner, plan review, researcher, research review, writer, and report review. The supervisor retries a rejected artifact once, then safely fails the workflow rather than looping forever. `executionTrace` records every node, decision, attempt, provider, and timestamp.
+
+### Redis persistence
+
+Set `REDIS_URL` in `.env` to persist complete jobs across API restarts:
+
+```env
+REDIS_URL=redis://localhost:6379
+REDIS_JOB_TTL_SECONDS=86400
+REDIS_KEY_PREFIX=research:job:
+REDIS_CONNECT_TIMEOUT_MS=2000
+REDIS_REQUIRED=false
+```
+
+Jobs are stored as JSON with a configurable TTL. When Redis is not configured, development uses memory storage. When Redis is configured but unavailable and `REDIS_REQUIRED=false`, the API keeps working with a mirrored memory fallback and health reports `degraded`. Set `REDIS_REQUIRED=true` when persistence must be mandatory.
 
 ### Test
 

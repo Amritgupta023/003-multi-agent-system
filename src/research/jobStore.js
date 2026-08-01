@@ -1,8 +1,7 @@
 const { randomUUID } = require("node:crypto");
+const { getJobRepository } = require("../storage");
 
-const jobs = new Map();
-
-function createJob({ topic, depth, maxSources }) {
+async function createJob({ topic, depth, maxSources }) {
   const now = new Date().toISOString();
   const job = {
     id: randomUUID(),
@@ -15,16 +14,16 @@ function createJob({ topic, depth, maxSources }) {
     updatedAt: now,
   };
 
-  jobs.set(job.id, job);
+  await getJobRepository().save(job);
   return job;
 }
 
-function getJob(id) {
-  return jobs.get(id) || null;
+async function getJob(id) {
+  return getJobRepository().get(id);
 }
 
-function updateJob(id, changes) {
-  const existingJob = getJob(id);
+async function updateJob(id, changes) {
+  const existingJob = await getJob(id);
   if (!existingJob) return null;
 
   const updatedJob = {
@@ -32,12 +31,20 @@ function updateJob(id, changes) {
     ...changes,
     updatedAt: new Date().toISOString(),
   };
-  jobs.set(id, updatedJob);
+  await getJobRepository().save(updatedJob);
   return updatedJob;
 }
 
-function clearJobs() {
-  jobs.clear();
+async function clearJobs() {
+  return getJobRepository().clear();
 }
 
-module.exports = { clearJobs, createJob, getJob, updateJob };
+async function getStorageHealth() {
+  return getJobRepository().health();
+}
+
+async function closeJobStore() {
+  return getJobRepository().close();
+}
+
+module.exports = { clearJobs, closeJobStore, createJob, getJob, getStorageHealth, updateJob };

@@ -2,6 +2,7 @@ require("dotenv").config();
 
 const { app } = require("./app");
 const { getConfig } = require("./config");
+const { closeJobStore } = require("./research/jobStore");
 
 const config = getConfig();
 
@@ -11,7 +12,10 @@ const server = app.listen(config.port, () => {
 
 function shutdown(signal) {
   console.log(`${signal} received. Closing HTTP server...`);
-  server.close(() => process.exit(0));
+  server.close(async () => {
+    await closeJobStore();
+    process.exit(0);
+  });
 }
 
 process.on("SIGINT", () => shutdown("SIGINT"));

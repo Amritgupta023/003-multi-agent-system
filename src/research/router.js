@@ -8,7 +8,7 @@ const { validateResearchRequest } = require("./validation");
 
 const researchRouter = express.Router();
 
-researchRouter.post("/", (request, response) => {
+researchRouter.post("/", async (request, response) => {
   const validation = validateResearchRequest(request.body);
 
   if (!validation.valid) {
@@ -22,7 +22,7 @@ researchRouter.post("/", (request, response) => {
     });
   }
 
-  const job = createJob(validation.value);
+  const job = await createJob(validation.value);
   return response.status(202).location(`/api/research/${job.id}`).json({
     success: true,
     message: "Research job accepted",
@@ -31,7 +31,7 @@ researchRouter.post("/", (request, response) => {
 });
 
 researchRouter.post("/:jobId/plan", async (request, response) => {
-  const job = getJob(request.params.jobId);
+  const job = await getJob(request.params.jobId);
 
   if (!job) {
     return response.status(404).json({
@@ -52,7 +52,7 @@ researchRouter.post("/:jobId/plan", async (request, response) => {
   }
 
   const plan = await generateResearchPlan(job);
-  const plannedJob = updateJob(job.id, {
+  const plannedJob = await updateJob(job.id, {
     status: "planned",
     progress: 25,
     currentStep: "waiting_for_researcher",
@@ -67,7 +67,7 @@ researchRouter.post("/:jobId/plan", async (request, response) => {
 });
 
 researchRouter.post("/:jobId/research", async (request, response) => {
-  const job = getJob(request.params.jobId);
+  const job = await getJob(request.params.jobId);
 
   if (!job) {
     return response.status(404).json({
@@ -98,7 +98,7 @@ researchRouter.post("/:jobId/research", async (request, response) => {
   }
 
   const research = await conductResearch(job);
-  const researchedJob = updateJob(job.id, {
+  const researchedJob = await updateJob(job.id, {
     status: "researched",
     progress: 65,
     currentStep: "waiting_for_writer",
@@ -112,8 +112,8 @@ researchRouter.post("/:jobId/research", async (request, response) => {
   });
 });
 
-researchRouter.post("/:jobId/write", (request, response) => {
-  const job = getJob(request.params.jobId);
+researchRouter.post("/:jobId/write", async (request, response) => {
+  const job = await getJob(request.params.jobId);
 
   if (!job) {
     return response.status(404).json({
@@ -144,7 +144,7 @@ researchRouter.post("/:jobId/write", (request, response) => {
   }
 
   const report = writeReport(job);
-  const completedJob = updateJob(job.id, {
+  const completedJob = await updateJob(job.id, {
     status: "completed",
     progress: 100,
     currentStep: "completed",
@@ -159,7 +159,7 @@ researchRouter.post("/:jobId/write", (request, response) => {
 });
 
 researchRouter.post("/:jobId/run", async (request, response) => {
-  const job = getJob(request.params.jobId);
+  const job = await getJob(request.params.jobId);
 
   if (!job) {
     return response.status(404).json({
@@ -173,7 +173,7 @@ researchRouter.post("/:jobId/run", async (request, response) => {
   }
 
   const result = await runSupervisor(job);
-  const updatedJob = updateJob(job.id, {
+  const updatedJob = await updateJob(job.id, {
     ...result.job,
     executionTrace: result.trace,
     workflow: {
@@ -194,8 +194,8 @@ researchRouter.post("/:jobId/run", async (request, response) => {
   return response.status(200).json({ success: true, message: "Supervised research workflow completed", data: updatedJob });
 });
 
-researchRouter.get("/:jobId", (request, response) => {
-  const job = getJob(request.params.jobId);
+researchRouter.get("/:jobId", async (request, response) => {
+  const job = await getJob(request.params.jobId);
 
   if (!job) {
     return response.status(404).json({
