@@ -117,3 +117,21 @@ After a job completes, retrieve JSON from `GET /api/research/{jobId}/report`, do
 ```powershell
 npm test
 ```
+
+## React client
+
+The research workspace UI lives in `client/`. Run the API and client in separate terminals:
+
+```powershell
+npm.cmd start
+```
+
+```powershell
+npm.cmd run client:dev
+```
+
+Open `http://localhost:5173`. During development, Vite proxies `/api` requests to the API on port `3000`. To create a production bundle, run:
+
+```powershell
+npm.cmd run client:build
+```
