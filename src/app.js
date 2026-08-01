@@ -11,7 +11,7 @@ app.get("/", (_request, response) => {
   response.status(200).json({
     success: true,
     message: "Multi-Agent Research Assistant API",
-    level: 10,
+    level: 11,
   });
 });
 
@@ -21,7 +21,7 @@ app.get("/api/health", async (_request, response) => {
     success: true,
     status: "ok",
     service: "multi-agent-research-assistant",
-    level: 10,
+    level: 11,
     storage,
     timestamp: new Date().toISOString(),
   });

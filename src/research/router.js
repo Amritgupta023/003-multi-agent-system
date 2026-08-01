@@ -4,6 +4,7 @@ const { conductResearch } = require("../agents/tavilyResearcher");
 const { writeReport } = require("../agents/writer");
 const { runSupervisor } = require("../workflow/supervisorGraph");
 const { getActiveRun, startBackgroundRun } = require("../workflow/backgroundRunner");
+const { createReportFilename, validateCitationIntegrity } = require("../reports/reportDelivery");
 const { createJob, getJob, updateJob } = require("./jobStore");
 const { validateResearchRequest } = require("./validation");
 
@@ -298,8 +299,67 @@ researchRouter.get("/:jobId/status", async (request, response) => {
       updatedAt: job.updatedAt,
       links: {
         job: `/api/research/${job.id}`,
-        report: job.report ? `/api/research/${job.id}` : null,
+        report: job.report ? `/api/research/${job.id}/report` : null,
       },
+    },
+  });
+});
+
+researchRouter.get("/:jobId/report", async (request, response) => {
+  const job = await getJob(request.params.jobId);
+  if (!job) return jobNotFound(response, request.params.jobId);
+  if (!job.report) return reportNotReady(response, job);
+
+  const integrity = validateCitationIntegrity(job.report);
+  if (!integrity.valid) return invalidReport(response, integrity.errors);
+
+  response.set("Cache-Control", "private, max-age=60");
+  return response.status(200).json({
+    success: true,
+    data: {
+      jobId: job.id,
+      status: job.status,
+      topic: job.topic,
+      report: job.report,
+      links: {
+        markdown: `/api/research/${job.id}/report/markdown`,
+        citations: `/api/research/${job.id}/report/citations`,
+      },
+    },
+  });
+});
+
+researchRouter.get("/:jobId/report/markdown", async (request, response) => {
+  const job = await getJob(request.params.jobId);
+  if (!job) return jobNotFound(response, request.params.jobId);
+  if (!job.report) return reportNotReady(response, job);
+
+  const integrity = validateCitationIntegrity(job.report);
+  if (!integrity.valid) return invalidReport(response, integrity.errors);
+
+  const filename = createReportFilename(job.topic, job.id);
+  response.set("Cache-Control", "private, max-age=60");
+  response.attachment(filename);
+  response.type("text/markdown; charset=utf-8");
+  return response.status(200).send(job.report.markdown);
+});
+
+researchRouter.get("/:jobId/report/citations", async (request, response) => {
+  const job = await getJob(request.params.jobId);
+  if (!job) return jobNotFound(response, request.params.jobId);
+  if (!job.report) return reportNotReady(response, job);
+
+  const integrity = validateCitationIntegrity(job.report);
+  if (!integrity.valid) return invalidReport(response, integrity.errors);
+
+  response.set("Cache-Control", "private, max-age=60");
+  return response.status(200).json({
+    success: true,
+    data: {
+      jobId: job.id,
+      evidenceStatus: job.report.evidenceStatus,
+      citationCount: job.report.citationCount,
+      citations: job.report.citations,
     },
   });
 });
@@ -321,3 +381,32 @@ researchRouter.get("/:jobId", async (request, response) => {
 });
 
 module.exports = { researchRouter };
+
+function jobNotFound(response, jobId) {
+  return response.status(404).json({
+    success: false,
+    error: { code: "JOB_NOT_FOUND", message: `Research job ${jobId} was not found` },
+  });
+}
+
+function reportNotReady(response, job) {
+  return response.status(409).json({
+    success: false,
+    error: {
+      code: "REPORT_NOT_READY",
+      message: "The research report has not been generated yet",
+      details: { status: job.status, progress: job.progress, currentStep: job.currentStep },
+    },
+  });
+}
+
+function invalidReport(response, errors) {
+  return response.status(422).json({
+    success: false,
+    error: {
+      code: "REPORT_CITATIONS_INVALID",
+      message: "The report failed citation integrity validation",
+      details: errors,
+    },
+  });
+}

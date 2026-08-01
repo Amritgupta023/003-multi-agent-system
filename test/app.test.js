@@ -6,7 +6,7 @@ process.env.TAVILY_API_KEY = "";
 process.env.REDIS_URL = "";
 
 const { app } = require("../src/app");
-const { clearJobs } = require("../src/research/jobStore");
+const { clearJobs, updateJob } = require("../src/research/jobStore");
 
 let server;
 let baseUrl;
@@ -32,7 +32,7 @@ test("GET /api/health reports a healthy service", async () => {
   assert.equal(response.status, 200);
   assert.equal(body.success, true);
   assert.equal(body.status, "ok");
-  assert.equal(body.level, 10);
+  assert.equal(body.level, 11);
   assert.deepEqual(body.storage, { provider: "memory", status: "ready", persistent: false });
 });
 
@@ -349,6 +349,76 @@ test("async endpoints validate missing and completed jobs", async () => {
 
   assert.equal(rerunResponse.status, 409);
   assert.equal(rerunBody.error.code, "JOB_ALREADY_COMPLETED");
+});
+
+test("report endpoints reject jobs whose report is not ready", async () => {
+  const createResponse = await fetch(`${baseUrl}/api/research`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ topic: "Report readiness test" }),
+  });
+  const job = (await createResponse.json()).data;
+  const response = await fetch(`${baseUrl}/api/research/${job.id}/report`);
+  const body = await response.json();
+
+  assert.equal(response.status, 409);
+  assert.equal(body.error.code, "REPORT_NOT_READY");
+  assert.equal(body.error.details.status, "queued");
+});
+
+test("report endpoints deliver JSON, Markdown, and citations", async () => {
+  const createResponse = await fetch(`${baseUrl}/api/research`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ topic: "Clean energy export report", depth: "quick" }),
+  });
+  const job = (await createResponse.json()).data;
+  await fetch(`${baseUrl}/api/research/${job.id}/run`, { method: "POST" });
+
+  const jsonResponse = await fetch(`${baseUrl}/api/research/${job.id}/report`);
+  const jsonBody = await jsonResponse.json();
+  assert.equal(jsonResponse.status, 200);
+  assert.equal(jsonBody.data.jobId, job.id);
+  assert.equal(jsonBody.data.report.format, "markdown");
+  assert.equal(jsonBody.data.links.markdown, `/api/research/${job.id}/report/markdown`);
+
+  const markdownResponse = await fetch(`${baseUrl}/api/research/${job.id}/report/markdown`);
+  const markdown = await markdownResponse.text();
+  assert.equal(markdownResponse.status, 200);
+  assert.match(markdownResponse.headers.get("content-type"), /^text\/markdown/);
+  assert.match(markdownResponse.headers.get("content-disposition"), /attachment; filename="clean-energy-export-report-/);
+  assert.ok(markdown.startsWith("# Clean energy export report"));
+
+  const citationsResponse = await fetch(`${baseUrl}/api/research/${job.id}/report/citations`);
+  const citationsBody = await citationsResponse.json();
+  assert.equal(citationsResponse.status, 200);
+  assert.equal(citationsBody.data.evidenceStatus, "unverified");
+  assert.equal(citationsBody.data.citationCount, 0);
+  assert.deepEqual(citationsBody.data.citations, []);
+});
+
+test("report delivery rejects corrupted citation metadata", async () => {
+  const createResponse = await fetch(`${baseUrl}/api/research`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ topic: "Corrupted report test" }),
+  });
+  const job = (await createResponse.json()).data;
+  await updateJob(job.id, {
+    status: "completed",
+    report: {
+      format: "markdown",
+      markdown: "# Corrupted report test",
+      evidenceStatus: "source_backed",
+      citationCount: 1,
+      citations: [],
+    },
+  });
+
+  const response = await fetch(`${baseUrl}/api/research/${job.id}/report`);
+  const body = await response.json();
+  assert.equal(response.status, 422);
+  assert.equal(body.error.code, "REPORT_CITATIONS_INVALID");
 });
 
 test("unknown routes return the standard 404 response", async () => {

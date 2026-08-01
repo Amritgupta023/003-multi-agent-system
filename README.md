@@ -2,7 +2,7 @@
 
 Node.js API that will grow into a supervised research workflow powered by LangGraph, Gemini, Tavily, Redis, and Express.
 
-## Level 10: Asynchronous background execution
+## Level 11: Report delivery
 
 ### Run locally
 
@@ -26,6 +26,9 @@ The API runs at `http://localhost:3000` by default.
 - `POST /api/research/:jobId/run-async` — start the supervised workflow in the background
 - `GET /api/research/:jobId/status` — poll compact progress and failure details
 - `POST /api/research/:jobId/retry` — restart a failed workflow from a clean state
+- `GET /api/research/:jobId/report` — retrieve the complete report as JSON
+- `GET /api/research/:jobId/report/markdown` — download the raw Markdown report
+- `GET /api/research/:jobId/report/citations` — retrieve citation metadata only
 
 ### Create a research job
 
@@ -39,7 +42,7 @@ The API runs at `http://localhost:3000` by default.
 
 `depth` can be `quick`, `standard`, or `deep`. When omitted, `depth` defaults to `standard` and `maxSources` defaults to `5`.
 
-Jobs are stored in process memory at this level, so restarting the API clears them. Redis persistence is introduced at Level 9.
+Jobs use Redis persistence when `REDIS_URL` is configured; otherwise development falls back to process memory.
 
 ### Generate a plan
 
@@ -104,6 +107,10 @@ Jobs are stored as JSON with a configurable TTL. When Redis is not configured, d
 Set `"runAsync": true` while creating a job, or call `POST /api/research/{jobId}/run-async`. Both return `202 Accepted` immediately with a run ID and status URL. Poll `GET /api/research/{jobId}/status` until the status becomes `completed` or `failed`.
 
 Every LangGraph state update is persisted, so Redis-backed jobs expose stage-by-stage progress. In-process locks reject concurrent runs for the same job. Failed jobs include safe retry metadata and can be restarted with `POST /api/research/{jobId}/retry`.
+
+### Report delivery
+
+After a job completes, retrieve JSON from `GET /api/research/{jobId}/report`, download Markdown from `/report/markdown`, or fetch only source metadata from `/report/citations`. Delivery validates citation numbering, URLs, duplicates, inline markers, and evidence status before returning a report. Incomplete jobs return `409 REPORT_NOT_READY`.
 
 ### Test
 
