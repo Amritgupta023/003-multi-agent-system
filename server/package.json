@@ -1,0 +1,25 @@
+{
+  "name": "multi-agent-research-assistant",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A multi-agent research assistant built with Node.js, LangGraph, Gemini, Tavily, Redis, and Express.",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "test": "node --test",
+    "client:dev": "npm --prefix client run dev",
+    "client:build": "npm --prefix client run build"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@google/genai": "^2.15.0",
+    "@langchain/core": "^1.2.4",
+    "@langchain/langgraph": "^1.4.8",
+    "dotenv": "^17.4.2",
+    "express": "^5.1.0",
+    "redis": "^6.2.0"
+  }
+}

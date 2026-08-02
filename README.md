@@ -118,6 +118,15 @@ After a job completes, retrieve JSON from `GET /api/research/{jobId}/report`, do
 npm test
 ```
 
+## Project structure
+
+```text
+client/  React and Vite interface
+server/  Express API, agents, workflows, storage, tests, and backend configuration
+```
+
+Root npm commands forward to the appropriate workspace, so the existing development commands continue to work.
+
 ## React client
 
 The research workspace UI lives in `client/`. Run the API and client in separate terminals:
